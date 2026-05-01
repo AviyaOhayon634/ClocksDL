@@ -1,0 +1,24 @@
+# Data (לא מעלים דאטה)
+data/
+clock_project/data/
+
+# Models (משקלים)
+models/
+*.pth
+
+# Results / logs
+results/
+*.csv
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
