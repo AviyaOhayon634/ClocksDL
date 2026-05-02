@@ -1,449 +1,426 @@
+import csv
+import math
 import os
 import random
-import math
-import csv
+from typing import List, Set, Tuple
+
 from PIL import Image, ImageDraw, ImageFont
-from typing import Tuple, List, Set
 
-# ===================== CONSTANTS & CONFIG =====================
+# ==============================================================================
+# CONFIGURATION & CONSTANTS
+# ==============================================================================
 
-ROMAN_NUMERALS = ["XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
-ARABIC_NUMERALS = ["12", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
+ROMAN_CHARS = ["XII", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"]
+ARABIC_CHARS = ["12", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"]
 
-COLOR_PALETTES = {
-    'classic_white': {'bg': (245, 245, 245), 'face': (255, 255, 255), 'hands': (30, 30, 30), 'accent': (200, 50, 50), 'markers': (50, 50, 50)},
-    'dark_modern':   {'bg': (25, 25, 30), 'face': (45, 45, 50), 'hands': (240, 240, 240), 'accent': (80, 200, 255), 'markers': (200, 200, 200)},
-    'vintage_cream': {'bg': (210, 190, 170), 'face': (250, 240, 220), 'hands': (80, 60, 40), 'accent': (150, 80, 50), 'markers': (100, 80, 60)},
-    'minimal_gray':  {'bg': (240, 240, 245), 'face': (255, 255, 255), 'hands': (60, 60, 60), 'accent': (220, 60, 60), 'markers': (180, 180, 180)},
-    'blue_ocean':    {'bg': (30, 50, 80), 'face': (50, 80, 120), 'hands': (220, 230, 250), 'accent': (100, 200, 255), 'markers': (150, 180, 220)},
-    'orange_warm':   {'bg': (255, 200, 150), 'face': (255, 145, 70), 'hands': (100, 50, 10), 'accent': (255, 100, 20), 'markers': (150, 80, 30)},
-    'green_nature':  {'bg': (200, 220, 200), 'face': (240, 250, 240), 'hands': (40, 80, 40), 'accent': (80, 150, 80), 'markers': (100, 150, 100)},
-    'purple_elegant':{'bg': (230, 220, 240), 'face': (250, 245, 255), 'hands': (80, 60, 100), 'accent': (150, 100, 180), 'markers': (120, 100, 140)},
-    'black_white':   {'bg': (0, 0, 0), 'face': (30, 30, 30), 'hands': (255, 255, 255), 'accent': (255, 50, 50), 'markers': (200, 200, 200)},
-    'gold_luxury':   {'bg': (50, 40, 30), 'face': (240, 230, 210), 'hands': (150, 120, 60), 'accent': (200, 170, 80), 'markers': (180, 150, 80)}
+
+THEME_CONFIG = {
+    'neon_cyberpunk':   {'bg': (10, 10, 20),    'face': (20, 20, 35),    'hands': (0, 255, 255),   'accent': (255, 0, 255),   'markers': (0, 255, 150)},
+    'standard_classic': {'bg': (240, 240, 240), 'face': (255, 255, 255), 'hands': (0, 0, 0),       'accent': (255, 0, 0),     'markers': (0, 0, 0)},
+    'pastel_dream':     {'bg': (255, 228, 225), 'face': (255, 240, 245), 'hands': (120, 150, 200), 'accent': (250, 128, 114), 'markers': (150, 200, 150)},
+    'industrial_alert': {'bg': (40, 40, 40),    'face': (220, 220, 0),   'hands': (10, 10, 10),    'accent': (255, 50, 0),    'markers': (20, 20, 20)},
+    'crimson_shadow':   {'bg': (20, 5, 5),      'face': (40, 10, 10),    'hands': (220, 200, 200), 'accent': (255, 0, 0),     'markers': (150, 50, 50)},
+    'arctic_frost':     {'bg': (230, 245, 255), 'face': (200, 230, 250), 'hands': (20, 60, 100),   'accent': (0, 150, 255),   'markers': (100, 150, 200)},
+    'synthwave_sunset': {'bg': (45, 20, 60),    'face': (70, 30, 80),    'hands': (255, 140, 0),   'accent': (255, 20, 147),  'markers': (200, 100, 150)},
+    'desert_terracotta':{'bg': (210, 180, 140), 'face': (230, 200, 160), 'hands': (90, 60, 40),    'accent': (200, 80, 40),   'markers': (130, 90, 60)},
+    'deep_forest':      {'bg': (15, 30, 15),    'face': (25, 45, 25),    'hands': (180, 200, 180), 'accent': (150, 200, 50),  'markers': (100, 130, 100)},
+    'royal_velvet':     {'bg': (50, 10, 40),    'face': (70, 20, 60),    'hands': (240, 210, 150), 'accent': (255, 215, 0),   'markers': (200, 160, 180)},
+    'slate_teal':       {'bg': (30, 45, 50),    'face': (50, 70, 80),    'hands': (240, 250, 250), 'accent': (0, 200, 150),   'markers': (150, 180, 190)}
 }
 
-# ===================== HELPER FUNCTIONS =====================
+# ==============================================================================
+# CORE UTILITIES
+# ==============================================================================
 
-def get_font(size_px, font_name="arial.ttf"):
-    import sys
-    size_px = int(size_px)
+def load_truetype_font(pixel_size: int, font_target: str = "arial.ttf") -> ImageFont:
+    """Attempts to load a specific font size, falling back to OS defaults."""
+    target_size = int(pixel_size)
     
-    # List of fonts to try in order
-    candidates = [
-        font_name,
+    font_paths = [
+        font_target,
         "Arial.ttf",
         "DejaVuSans.ttf",
-        "DejaVuSans-Bold.ttf", 
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-        "/System/Library/Fonts/Helvetica.ttc",      # macOS
-        "/System/Library/Fonts/Arial.ttf",          # macOS
-        "C:/Windows/Fonts/arial.ttf",               # Windows
-        "C:/Windows/Fonts/cour.ttf",                # Windows fallback
+        "DejaVuSans-Bold.ttf",
     ]
     
-    for candidate in candidates:
+    for path in font_paths:
         try:
-            font = ImageFont.truetype(candidate, size=size_px)
-            return font
+            return ImageFont.truetype(path, size=target_size)
         except (IOError, OSError):
             continue
-    
-    # If nothing works, print a warning so you know
-    print(f"WARNING: No truetype font found! Text will be tiny. Install fonts or add path.")
+            
+    print("WARNING: Truetype font missing. Text rendering will use tiny default font.")
     return ImageFont.load_default()
 
-def rotate_point(point, center, angle_rad):
-    """Rotates a point (x, y) around center (cx, cy) by angle_rad."""
-    x, y = point
-    cx, cy = center
-    new_x = cx + (x - cx) * math.cos(angle_rad) - (y - cy) * math.sin(angle_rad)
-    new_y = cy + (x - cx) * math.sin(angle_rad) + (y - cy) * math.cos(angle_rad)
-    return new_x, new_y
-
-def draw_hand_fancy(draw, center, angle_rad, length, width, color, style='line'):
-    """
-    Draws clock hands in various shapes:
-    - 'line': Standard rectangle (classic)
-    - 'tapered': Triangle getting thinner at the end
-    - 'arrow': Classic arrow shape
-    - 'diamond': Diamond shape
-    """
-    cx, cy = center
+def pivot_coordinates(pt: Tuple[float, float], pivot: Tuple[float, float], rad_angle: float) -> Tuple[float, float]:
+    """Applies a rotation matrix to a specific 2D coordinate."""
+    px, py = pt
+    cx, cy = pivot
     
-    # Calculate the tip position
-    tip_x = cx + length * math.cos(angle_rad)
-    tip_y = cy + length * math.sin(angle_rad)
-
-    if style == 'line':
-        draw.line((cx, cy, tip_x, tip_y), fill=color, width=int(width))
-        
-    elif style == 'tapered':
-        # Base of the triangle (perpendicular to angle)
-        base_w = width * 1.5
-        angle_perp = angle_rad + math.pi / 2
-        
-        # Calculate base points slightly "behind" center so it covers the pivot
-        back_offset = width
-        base_cx = cx - back_offset * math.cos(angle_rad)
-        base_cy = cy - back_offset * math.sin(angle_rad)
-        
-        p1 = (base_cx + base_w * math.cos(angle_perp), base_cy + base_w * math.sin(angle_perp))
-        p2 = (base_cx - base_w * math.cos(angle_perp), base_cy - base_w * math.sin(angle_perp))
-        
-        draw.polygon([p1, p2, (tip_x, tip_y)], fill=color)
-
-    elif style == 'arrow':
-        # Shaft + Head
-        shaft_len = length * 0.7
-        shaft_w = width
-        head_w = width * 2.5
-        
-        # Shaft end point
-        s_end_x = cx + shaft_len * math.cos(angle_rad)
-        s_end_y = cy + shaft_len * math.sin(angle_rad)
-        
-        # Draw Shaft
-        draw.line((cx, cy, s_end_x, s_end_y), fill=color, width=int(shaft_w))
-        
-        # Draw Arrow Head
-        angle_perp = angle_rad + math.pi / 2
-        p1 = (s_end_x + head_w/2 * math.cos(angle_perp), s_end_y + head_w/2 * math.sin(angle_perp))
-        p2 = (s_end_x - head_w/2 * math.cos(angle_perp), s_end_y - head_w/2 * math.sin(angle_perp))
-        draw.polygon([p1, p2, (tip_x, tip_y)], fill=color)
-
-    elif style == 'diamond':
-        # Kite/Diamond shape
-        mid_len = length * 0.3
-        max_w = width * 2
-        angle_perp = angle_rad + math.pi / 2
-        
-        # Widest point
-        mid_x = cx + mid_len * math.cos(angle_rad)
-        mid_y = cy + mid_len * math.sin(angle_rad)
-        
-        p_left = (mid_x + max_w * math.cos(angle_perp), mid_y + max_w * math.sin(angle_perp))
-        p_right = (mid_x - max_w * math.cos(angle_perp), mid_y - max_w * math.sin(angle_perp))
-        
-        # Back tail
-        tail_len = length * 0.15
-        tail_x = cx - tail_len * math.cos(angle_rad)
-        tail_y = cy - tail_len * math.sin(angle_rad)
-        
-        draw.polygon([(tail_x, tail_y), p_left, (tip_x, tip_y), p_right], fill=color)
-
-def draw_markers(draw, center, radius, style, color, size, font=None):
-    """Draws face markers: lines, dots, arabic numbers, or roman numerals"""
-    cx, cy = center
+    sin_a = math.sin(rad_angle)
+    cos_a = math.cos(rad_angle)
     
-    for i in range(12):
-        angle = math.radians(i * 30 - 90) # 0 is at 12 o'clock (which is -90 deg)
+    rot_x = cx + (px - cx) * cos_a - (py - cy) * sin_a
+    rot_y = cy + (px - cx) * sin_a + (py - cy) * cos_a
+    return rot_x, rot_y
+
+def render_clock_hand(canvas: ImageDraw, pivot_pt: Tuple[float, float], rad_angle: float, 
+                      hand_len: float, hand_thickness: float, fill_color: Tuple[int, int, int], 
+                      design: str = 'line'):
+    """Renders a clock hand based on the designated style string."""
+    mid_x, mid_y = pivot_pt
+    
+    # Pre-calculate the extreme tip of the hand
+    end_x = mid_x + hand_len * math.cos(rad_angle)
+    end_y = mid_y + hand_len * math.sin(rad_angle)
+
+    if design == 'line':
+        canvas.line((mid_x, mid_y, end_x, end_y), fill=fill_color, width=int(hand_thickness))
         
-        # Distances from center
-        dist_outer = radius - size[0] // 40
-        dist_text = radius - size[0] // 10 # Text needs to be further in
+    elif design == 'tapered':
+        base_width = hand_thickness * 1.5
+        perp_angle = rad_angle + (math.pi / 2)
         
-        if style in ['arabic', 'roman']:
-            text = ARABIC_NUMERALS[i] if style == 'arabic' else ROMAN_NUMERALS[i]
+        offset = hand_thickness
+        base_x = mid_x - offset * math.cos(rad_angle)
+        base_y = mid_y - offset * math.sin(rad_angle)
+        
+        pt1 = (base_x + base_width * math.cos(perp_angle), base_y + base_width * math.sin(perp_angle))
+        pt2 = (base_x - base_width * math.cos(perp_angle), base_y - base_width * math.sin(perp_angle))
+        
+        canvas.polygon([pt1, pt2, (end_x, end_y)], fill=fill_color)
+
+    elif design == 'arrow':
+        stem_length = hand_len * 0.7
+        arrow_width = hand_thickness * 2.5
+        
+        stem_x = mid_x + stem_length * math.cos(rad_angle)
+        stem_y = mid_y + stem_length * math.sin(rad_angle)
+        
+        canvas.line((mid_x, mid_y, stem_x, stem_y), fill=fill_color, width=int(hand_thickness))
+        
+        perp_angle = rad_angle + (math.pi / 2)
+        pt1 = (stem_x + (arrow_width / 2) * math.cos(perp_angle), stem_y + (arrow_width / 2) * math.sin(perp_angle))
+        pt2 = (stem_x - (arrow_width / 2) * math.cos(perp_angle), stem_y - (arrow_width / 2) * math.sin(perp_angle))
+        
+        canvas.polygon([pt1, pt2, (end_x, end_y)], fill=fill_color)
+
+    elif design == 'diamond':
+        flare_dist = hand_len * 0.3
+        max_span = hand_thickness * 2
+        perp_angle = rad_angle + (math.pi / 2)
+        
+        flare_x = mid_x + flare_dist * math.cos(rad_angle)
+        flare_y = mid_y + flare_dist * math.sin(rad_angle)
+        
+        left_pt = (flare_x + max_span * math.cos(perp_angle), flare_y + max_span * math.sin(perp_angle))
+        right_pt = (flare_x - max_span * math.cos(perp_angle), flare_y - max_span * math.sin(perp_angle))
+        
+        rear_len = hand_len * 0.15
+        rear_x = mid_x - rear_len * math.cos(rad_angle)
+        rear_y = mid_y - rear_len * math.sin(rad_angle)
+        
+        canvas.polygon([(rear_x, rear_y), left_pt, (end_x, end_y), right_pt], fill=fill_color)
+
+def render_face_markers(canvas: ImageDraw, pivot: Tuple[int, int], rad: int, 
+                        marker_type: str, color_val: Tuple[int, int, int], 
+                        dim: Tuple[int, int], custom_font=None):
+    """Generates the 12 hour indicators around the perimeter of the clock."""
+    cx, cy = pivot
+    
+    for idx in range(12):
+        theta = math.radians(idx * 30 - 90)
+        
+        outer_bound = rad - dim[0] // 40
+        text_bound = rad - dim[0] // 10 
+        
+        if marker_type in ['arabic', 'roman']:
+            lbl = ARABIC_CHARS[idx] if marker_type == 'arabic' else ROMAN_CHARS[idx]
             
-            # Position for text center
-            tx = cx + dist_text * math.cos(angle)
-            ty = cy + dist_text * math.sin(angle)
+            txt_x = cx + text_bound * math.cos(theta)
+            txt_y = cy + text_bound * math.sin(theta)
             
-            # Calculate text size to center it
-            left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-            w, h = right - left, bottom - top
-            draw.text((tx - w/2, ty - h/2), text, fill=color, font=font)
+            box_l, box_t, box_r, box_b = canvas.textbbox((0, 0), lbl, font=custom_font)
+            width = box_r - box_l
+            height = box_b - box_t
             
-        elif style == 'line':
-            dist_inner = radius - size[0] // 15
-            sx = cx + dist_inner * math.cos(angle)
-            sy = cy + dist_inner * math.sin(angle)
-            ex = cx + dist_outer * math.cos(angle)
-            ey = cy + dist_outer * math.sin(angle)
-            width = int(size[0] // 50) if i % 3 == 0 else int(size[0] // 100)
-            draw.line((sx, sy, ex, ey), fill=color, width=width)
+            canvas.text((txt_x - width / 2, txt_y - height / 2), lbl, fill=color_val, font=custom_font)
             
-        elif style == 'dot':
-            dist_dot = radius - size[0] // 20
-            dx = cx + dist_dot * math.cos(angle)
-            dy = cy + dist_dot * math.sin(angle)
-            r = size[0] // 50 if i % 3 == 0 else size[0] // 80
-            draw.ellipse((dx-r, dy-r, dx+r, dy+r), fill=color)
+        elif marker_type == 'line':
+            inner_bound = rad - dim[0] // 15
+            start_x = cx + inner_bound * math.cos(theta)
+            start_y = cy + inner_bound * math.sin(theta)
+            end_x = cx + outer_bound * math.cos(theta)
+            end_y = cy + outer_bound * math.sin(theta)
+            
+            stroke_weight = int(dim[0] // 50) if idx % 3 == 0 else int(dim[0] // 100)
+            canvas.line((start_x, start_y, end_x, end_y), fill=color_val, width=stroke_weight)
+            
+        elif marker_type == 'dot':
+            dot_dist = rad - dim[0] // 20
+            dx = cx + dot_dist * math.cos(theta)
+            dy = cy + dot_dist * math.sin(theta)
+            
+            dot_rad = dim[0] // 50 if idx % 3 == 0 else dim[0] // 80
+            canvas.ellipse((dx - dot_rad, dy - dot_rad, dx + dot_rad, dy + dot_rad), fill=color_val)
 
-# ===================== DIGITAL CLOCK FUNCTIONS =====================
+# ==============================================================================
+# DIGITAL RENDERERS
+# ==============================================================================
 
-def get_fitted_font(draw, text, max_width, max_height, start_size, font_name="arial.ttf", min_size=10):
-    size = int(start_size)
+def calculate_best_font(canvas: ImageDraw, content: str, max_w: int, max_h: int, 
+                        initial_pt: float, typeface="arial.ttf", limit_pt=10) -> ImageFont:
+    """Scales down the font size until the text fits within the given bounding box."""
+    current_pt = int(initial_pt)
 
-    while size >= min_size:
-        font = get_font(size, font_name)
-        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-        w, h = right - left, bottom - top
+    while current_pt >= limit_pt:
+        active_font = load_truetype_font(current_pt, typeface)
+        bound_l, bound_t, bound_r, bound_b = canvas.textbbox((0, 0), content, font=active_font)
+        
+        if (bound_r - bound_l) <= max_w and (bound_b - bound_t) <= max_h:
+            return active_font
+            
+        current_pt -= 2
 
-        if w <= max_width and h <= max_height:
-            return font
+    return load_truetype_font(limit_pt, typeface)
 
-        size -= 2
+def create_simple_digital(hr: int, mnt: int, sec: int, dimensions: Tuple[int, int]) -> Image:
+    canvas_img = Image.new('RGB', dimensions, color=(15, 15, 20))
+    painter = ImageDraw.Draw(canvas_img)
+    timestamp = f"{hr:02d}:{mnt:02d}:{sec:02d}"
 
-    return get_font(min_size, font_name)
+    w_limit = int(dimensions[0] * 0.85)
+    h_limit = int(dimensions[1] * 0.30)
 
-def draw_digital_simple(h, m, s, size):
-    img = Image.new('RGB', size, color=(15, 15, 20))
-    draw = ImageDraw.Draw(img)
-    time_str = f"{h:02d}:{m:02d}:{s:02d}"
+    chosen_font = calculate_best_font(painter, timestamp, w_limit, h_limit, int(dimensions[0] * 0.25))
 
-    max_width = int(size[0] * 0.85)
-    max_height = int(size[1] * 0.30)
-
-    font = get_fitted_font(
-        draw,
-        time_str,
-        max_width=max_width,
-        max_height=max_height,
-        start_size=int(size[0] * 0.25)
-    )
-
-    left, top, right, bottom = draw.textbbox((0, 0), time_str, font=font)
-    w, h_txt = right - left, bottom - top
-    x = (size[0] - w) / 2
-    y = (size[1] - h_txt) / 2
-
-    draw.text((x, y), time_str, fill=(220, 60, 60), font=font)
-    return img
-
-
-def draw_digital_segmented(h, m, s, size):
-    img = Image.new('RGB', size, color=(15, 15, 20))
-    draw = ImageDraw.Draw(img)
-
-    time_str = f"{h:02d}:{m:02d}:{s:02d}"
-
-    mgn = size[0] // 10
-    panel = [mgn, size[1] // 3, size[0] - mgn, 2 * size[1] // 3]
-
-    draw.rectangle(
-        panel,
-        fill=(25, 35, 25),
-        outline=(0, 140, 90),
-        width=2
-    )
-
-    panel_width = panel[2] - panel[0] - 12
-    panel_height = panel[3] - panel[1] - 12
-
-    font = get_fitted_font(
-        draw,
-        time_str,
-        max_width=panel_width,
-        max_height=panel_height,
-        start_size=int(size[0] * 0.22)
-    )
-
-    left, top, right, bottom = draw.textbbox((0, 0), time_str, font=font)
-    w, h_txt = right - left, bottom - top
-    x = (size[0] - w) / 2
-    y = (size[1] - h_txt) / 2
-
-    draw.text((x, y), time_str, fill=(0, 230, 150), font=font)
-    return img
-
-
-def draw_digital_lcd(h, m, s, size):
-    img = Image.new('RGB', size, color=(180, 200, 180))
-    draw = ImageDraw.Draw(img)
-
-    time_str = f"{h:02d}:{m:02d}:{s:02d}"
-
-    mgn = size[0] // 10
-    panel = [mgn, size[1] // 3, size[0] - mgn, 2 * size[1] // 3]
-
-    draw.rectangle(
-        panel,
-        fill=(200, 220, 200),
-        outline=(100, 120, 100),
-        width=2
-    )
-
-    panel_width = panel[2] - panel[0] - 12
-    panel_height = panel[3] - panel[1] - 12
-
-    font = get_fitted_font(
-        draw,
-        time_str,
-        max_width=panel_width,
-        max_height=panel_height,
-        start_size=int(size[0] * 0.22)
-    )
-
-    left, top, right, bottom = draw.textbbox((0, 0), time_str, font=font)
-    w, h_txt = right - left, bottom - top
-    x = (size[0] - w) / 2
-    y = (size[1] - h_txt) / 2
-
-    draw.text((x, y), time_str, fill=(40, 60, 40), font=font)
-    return img
-
-# ===================== ANALOG CLOCK FUNCTIONS =====================
-
-def draw_analog_dynamic(h, m, s, size, palette):
-    """
-    Dynamically generates an analog clock with random hands and random marker styles.
-    """
-    img = Image.new('RGB', size, color=palette['bg'])
-    draw = ImageDraw.Draw(img)
-    center = (size[0] // 2, size[1] // 2)
-    radius = min(size) // 2 - max(5, size[0] // 25)
+    b_left, b_top, b_right, b_bot = painter.textbbox((0, 0), timestamp, font=chosen_font)
+    txt_w, txt_h = b_right - b_left, b_bot - b_top
     
-    # 1. Draw Face
-    draw.ellipse((center[0]-radius, center[1]-radius, center[0]+radius, center[1]+radius),
-                 outline=palette['hands'], width=max(2, size[0]//128), fill=palette['face'])
-    
-    # 2. Randomize Marker Style
-    marker_style = random.choice(['line', 'dot', 'arabic', 'roman'])
-    marker_font = get_font(size[0] / 8) if marker_style in ['arabic', 'roman'] else None
-    
-    draw_markers(draw, center, radius, marker_style, palette['markers'], size, marker_font)
+    pos_x = (dimensions[0] - txt_w) / 2
+    pos_y = (dimensions[1] - txt_h) / 2
 
-    clean_bg = img.copy()
+    painter.text((pos_x, pos_y), timestamp, fill=(220, 60, 60), font=chosen_font)
+    return canvas_img
 
-    # 3. Randomize Hand Style
-    # We can mix styles (e.g., hour/min are tapered, second is line) or keep uniform
-    hand_style = random.choice(['line', 'tapered', 'arrow', 'diamond'])
+def create_segmented_digital(hr: int, mnt: int, sec: int, dimensions: Tuple[int, int]) -> Image:
+    canvas_img = Image.new('RGB', dimensions, color=(15, 15, 20))
+    painter = ImageDraw.Draw(canvas_img)
+    timestamp = f"{hr:02d}:{mnt:02d}:{sec:02d}"
+
+    margin = dimensions[0] // 10
+    display_box = [margin, dimensions[1] // 3, dimensions[0] - margin, 2 * dimensions[1] // 3]
+
+    painter.rectangle(display_box, fill=(25, 35, 25), outline=(0, 140, 90), width=2)
+
+    box_w = display_box[2] - display_box[0] - 12
+    box_h = display_box[3] - display_box[1] - 12
+
+    chosen_font = calculate_best_font(painter, timestamp, box_w, box_h, int(dimensions[0] * 0.22))
+
+    b_left, b_top, b_right, b_bot = painter.textbbox((0, 0), timestamp, font=chosen_font)
+    txt_w, txt_h = b_right - b_left, b_bot - b_top
     
-    # Calculate Angles
-    sec_angle = math.radians(s * 6 - 90)
-    min_angle = math.radians(m * 6 + s * 0.1 - 90)
-    hour_angle = math.radians((h % 12) * 30 + m * 0.5 - 90)
+    pos_x = (dimensions[0] - txt_w) / 2
+    pos_y = (dimensions[1] - txt_h) / 2
+
+    painter.text((pos_x, pos_y), timestamp, fill=(0, 230, 150), font=chosen_font)
+    return canvas_img
+
+def create_lcd_digital(hr: int, mnt: int, sec: int, dimensions: Tuple[int, int]) -> Image:
+    canvas_img = Image.new('RGB', dimensions, color=(180, 200, 180))
+    painter = ImageDraw.Draw(canvas_img)
+    timestamp = f"{hr:02d}:{mnt:02d}:{sec:02d}"
+
+    margin = dimensions[0] // 10
+    display_box = [margin, dimensions[1] // 3, dimensions[0] - margin, 2 * dimensions[1] // 3]
+
+    painter.rectangle(display_box, fill=(200, 220, 200), outline=(100, 120, 100), width=2)
+
+    box_w = display_box[2] - display_box[0] - 12
+    box_h = display_box[3] - display_box[1] - 12
+
+    chosen_font = calculate_best_font(painter, timestamp, box_w, box_h, int(dimensions[0] * 0.22))
+
+    b_left, b_top, b_right, b_bot = painter.textbbox((0, 0), timestamp, font=chosen_font)
+    txt_w, txt_h = b_right - b_left, b_bot - b_top
     
-    # Draw Hands (Hour, Minute, Second)
-    # Hour
-    draw_hand_fancy(draw, center, hour_angle, radius * 0.5, size[0] * 0.04, palette['hands'], hand_style)
-    # Minute
-    draw_hand_fancy(draw, center, min_angle, radius * 0.75, size[0] * 0.03, palette['hands'], hand_style)
-    # Second (usually thinner and often red/accent, usually 'line' or 'tapered' looks best)
-    sec_style = 'line' if hand_style == 'arrow' else hand_style 
-    draw_hand_fancy(draw, center, sec_angle, radius * 0.85, size[0] * 0.01, palette['accent'], sec_style)
+    pos_x = (dimensions[0] - txt_w) / 2
+    pos_y = (dimensions[1] - txt_h) / 2
+
+    painter.text((pos_x, pos_y), timestamp, fill=(40, 60, 40), font=chosen_font)
+    return canvas_img
+
+# ==============================================================================
+# ANALOG RENDERERS
+# ==============================================================================
+
+def generate_dynamic_analog(hr: int, mnt: int, sec: int, dimensions: Tuple[int, int], theme: dict) -> Tuple[Image.Image, Image.Image]:
+    """Builds a classic circular analog clock with randomized styles."""
+    base_img = Image.new('RGB', dimensions, color=theme['bg'])
+    painter = ImageDraw.Draw(base_img)
     
-    # Center Cap
-    cap_r = size[0] // 30
-    draw.ellipse((center[0]-cap_r, center[1]-cap_r, center[0]+cap_r, center[1]+cap_r), fill=palette['hands'])
+    midpoint = (dimensions[0] // 2, dimensions[1] // 2)
+    clock_rad = min(dimensions) // 2 - max(5, dimensions[0] // 25)
     
-    return img, clean_bg
-
-def draw_analog_square(h, m, s, size, palette):
-    """Square face variant (keeps simple lines for markers to fit corners better)"""
-    img = Image.new('RGB', size, color=palette['bg'])
-    draw = ImageDraw.Draw(img)
-    margin = size[0] // 10
-    face_rect = [margin, margin, size[0]-margin, size[1]-margin]
+    # Render background circle
+    painter.ellipse((midpoint[0] - clock_rad, midpoint[1] - clock_rad, 
+                     midpoint[0] + clock_rad, midpoint[1] + clock_rad),
+                    outline=theme['hands'], width=max(2, dimensions[0] // 128), fill=theme['face'])
     
-    draw.rectangle(face_rect, fill=palette['face'], outline=palette['hands'], width=3)
+    # Inject markers
+    m_style = random.choice(['line', 'dot', 'arabic', 'roman'])
+    m_font = load_truetype_font(dimensions[0] / 8) if m_style in ['arabic', 'roman'] else None
+    render_face_markers(painter, midpoint, clock_rad, m_style, theme['markers'], dimensions, m_font)
+
+    # Save a clean copy without hands
+    handless_copy = base_img.copy()
+
+    # Determine hand architecture
+    h_style = random.choice(['line', 'tapered', 'arrow', 'diamond'])
     
-    # Randomize numbers vs lines
-    center = (size[0]//2, size[1]//2)
-    radius = (size[0]//2) - margin - 10
-    marker_style = random.choice(['line', 'arabic'])
-    font = get_font(size[0]/9)
-    draw_markers(draw, center, radius, marker_style, palette['markers'], size, font)
-
-    clean_bg = img.copy()
-
-    # Hands
-    sec_angle = math.radians(s * 6 - 90)
-    min_angle = math.radians(m * 6 + s * 0.1 - 90)
-    hour_angle = math.radians((h % 12) * 30 + m * 0.5 - 90)
+    # Compute hand angles (radians)
+    theta_sec = math.radians(sec * 6 - 90)
+    theta_min = math.radians(mnt * 6 + sec * 0.1 - 90)
+    theta_hr = math.radians((hr % 12) * 30 + mnt * 0.5 - 90)
     
-    draw_hand_fancy(draw, center, hour_angle, radius*0.5, size[0]*0.04, palette['hands'], 'line')
-    draw_hand_fancy(draw, center, min_angle, radius*0.75, size[0]*0.03, palette['hands'], 'line')
-    draw_hand_fancy(draw, center, sec_angle, radius*0.85, size[0]*0.01, palette['accent'], 'line')
+    # Paint the hands
+    render_clock_hand(painter, midpoint, theta_hr, clock_rad * 0.5, dimensions[0] * 0.04, theme['hands'], h_style)
+    render_clock_hand(painter, midpoint, theta_min, clock_rad * 0.75, dimensions[0] * 0.03, theme['hands'], h_style)
     
-    return img, clean_bg
+    s_style = 'line' if h_style == 'arrow' else h_style 
+    render_clock_hand(painter, midpoint, theta_sec, clock_rad * 0.85, dimensions[0] * 0.01, theme['accent'], s_style)
+    
+    # Center pivot cap
+    pivot_radius = dimensions[0] // 30
+    painter.ellipse((midpoint[0] - pivot_radius, midpoint[1] - pivot_radius, 
+                     midpoint[0] + pivot_radius, midpoint[1] + pivot_radius), fill=theme['hands'])
+    
+    return base_img, handless_copy
 
-# ===================== DATASET GENERATION LOGIC =====================
+def generate_square_analog(hr: int, mnt: int, sec: int, dimensions: Tuple[int, int], theme: dict) -> Tuple[Image.Image, Image.Image]:
+    """Builds an alternative square-faced analog clock."""
+    base_img = Image.new('RGB', dimensions, color=theme['bg'])
+    painter = ImageDraw.Draw(base_img)
+    
+    padding = dimensions[0] // 10
+    bounding_rect = [padding, padding, dimensions[0] - padding, dimensions[1] - padding]
+    
+    painter.rectangle(bounding_rect, fill=theme['face'], outline=theme['hands'], width=3)
+    
+    midpoint = (dimensions[0] // 2, dimensions[1] // 2)
+    clock_rad = (dimensions[0] // 2) - padding - 10
+    
+    m_style = random.choice(['line', 'arabic'])
+    text_font = load_truetype_font(dimensions[0] / 9)
+    render_face_markers(painter, midpoint, clock_rad, m_style, theme['markers'], dimensions, text_font)
 
-DIGITAL_STYLES = [('simple', draw_digital_simple), ('lcd', draw_digital_lcd), ('segmented', draw_digital_segmented)]
-# Note: 'dynamic' covers classic, modern, and fancy combinations
-ANALOG_STYLES = [('dynamic', draw_analog_dynamic), ('square', draw_analog_square)]
+    handless_copy = base_img.copy()
 
-class DatasetManager:
-    def __init__(self, train_max_unique=400):
-        self.train_max_unique = train_max_unique
-        self.train_times: List[Tuple[int, int, int]] = []
-        self.test_times_used: Set[Tuple[int, int, int]] = set()
+    theta_sec = math.radians(sec * 6 - 90)
+    theta_min = math.radians(mnt * 6 + sec * 0.1 - 90)
+    theta_hr = math.radians((hr % 12) * 30 + mnt * 0.5 - 90)
+    
+    render_clock_hand(painter, midpoint, theta_hr, clock_rad * 0.5, dimensions[0] * 0.04, theme['hands'], 'line')
+    render_clock_hand(painter, midpoint, theta_min, clock_rad * 0.75, dimensions[0] * 0.03, theme['hands'], 'line')
+    render_clock_hand(painter, midpoint, theta_sec, clock_rad * 0.85, dimensions[0] * 0.01, theme['accent'], 'line')
+    
+    return base_img, handless_copy
 
-    def get_train_times(self):
-        if self.train_times: return self.train_times
-        pool = set()
-        while len(pool) < self.train_max_unique:
-            pool.add((random.randint(0, 23), random.randint(0, 59), random.randint(0, 59)))
-        self.train_times = list(pool)
-        return self.train_times
+# ==============================================================================
+# PIPELINE ORCHESTRATION
+# ==============================================================================
 
-    def get_test_time(self):
-        train_pool = set(self.get_train_times())
+DIGITAL_GENERATORS = [('simple', create_simple_digital), ('lcd', create_lcd_digital), ('segmented', create_segmented_digital)]
+ANALOG_GENERATORS = [('dynamic', generate_dynamic_analog), ('square', generate_square_analog)]
+
+class ClockDatasetBuilder:
+    def __init__(self, max_unique_train_samples=400):
+        self.max_unique_train_samples = max_unique_train_samples
+        self.training_times: List[Tuple[int, int, int]] = []
+
+    def fetch_train_times(self) -> List[Tuple[int, int, int]]:
+        if self.training_times:
+            return self.training_times
+            
+        unique_times = set()
+        while len(unique_times) < self.max_unique_train_samples:
+            unique_times.add((random.randint(0, 23), random.randint(0, 59), random.randint(0, 59)))
+            
+        self.training_times = list(unique_times)
+        return self.training_times
+
+    def generate_test_time(self) -> Tuple[int, int, int]:
+        train_set = set(self.fetch_train_times())
         while True:
-            t = (random.randint(0, 23), random.randint(0, 59), random.randint(0, 59))
-            if t not in train_pool: return t
+            candidate = (random.randint(0, 23), random.randint(0, 59), random.randint(0, 59))
+            if candidate not in train_set:
+                return candidate
 
-def generate_subset(manager, subset_name, count, root_dir, size):
-    print(f"Generating {subset_name} set ({count} images)...")
-    base_dir = os.path.join(root_dir, subset_name)
-    dig_dir = os.path.join(base_dir, 'digital')
-    ana_dir = os.path.join(base_dir, 'analog')
-    os.makedirs(dig_dir, exist_ok=True)
-    os.makedirs(ana_dir, exist_ok=True)
+def compile_dataset(builder: ClockDatasetBuilder, partition: str, total_samples: int, out_path: str, img_dim: Tuple[int, int]):
+    print(f"Creating '{partition}' partition with {total_samples} samples...")
     
-    csv_file = open(os.path.join(base_dir, 'labels.csv'), 'w', newline='')
-    writer = csv.writer(csv_file)
-    writer.writerow(['digital_filename', 'analog_filename', 'analog_clean_filename', 'hour', 'minute', 'second'])
-    train_pool = manager.get_train_times()
+    # Restructured output paths: dataset -> analog/digital -> train/test
+    dir_digital = os.path.join(out_path, 'digital', partition)
+    dir_analog = os.path.join(out_path, 'analog', partition)
     
-    for i in range(count):
-        h, m, s = random.choice(train_pool) if subset_name == 'train' else manager.get_test_time()
-        base = f"{h:02d}_{m:02d}_{s:02d}_{i:05d}"
+    os.makedirs(dir_digital, exist_ok=True)
+    os.makedirs(dir_analog, exist_ok=True)
+    
+    # Setup separate CSV files for digital and analog
+    csv_path_digital = os.path.join(dir_digital, 'labels.csv')
+    csv_path_analog = os.path.join(dir_analog, 'labels.csv')
+    
+    with open(csv_path_digital, 'w', newline='') as file_dig, \
+         open(csv_path_analog, 'w', newline='') as file_ana:
+        
+        writer_dig = csv.writer(file_dig)
+        writer_ana = csv.writer(file_ana)
+        
+        # Write specific headers for each
+        writer_dig.writerow(['filename', 'hour', 'minute', 'second'])
+        writer_ana.writerow(['filename', 'clean_filename', 'hour', 'minute', 'second'])
+        
+        training_pool = builder.fetch_train_times()
+        
+        for idx in range(total_samples):
+            hr, mnt, sec = random.choice(training_pool) if partition == 'train' else builder.generate_test_time()
+            file_prefix = f"{hr:02d}_{mnt:02d}_{sec:02d}_{idx:05d}"
 
-        # Select Styles
-        dig_name, dig_func = random.choice(DIGITAL_STYLES)
-        ana_name, ana_func = random.choice(ANALOG_STYLES)
-        pal_name = random.choice(list(COLOR_PALETTES.keys()))
-        
-        # Render
-        dig_img = dig_func(h, m, s, size)
-        ana_img, clean_img = ana_func(h, m, s, size, COLOR_PALETTES[pal_name])
-        clean_fn = f"{base}_ana_clean_{ana_name}_{pal_name}.png"
-        clean_img.save(os.path.join(ana_dir, clean_fn))
-        
-        # Save        
-        d_fn = f"{base}_dig_{dig_name}.png"
-        a_fn = f"{base}_ana_{ana_name}_{pal_name}.png"
-        clean_fn = f"{base}_ana_clean_{ana_name}_{pal_name}.png"
-        
-        dig_img.save(os.path.join(dig_dir, d_fn))
-        ana_img.save(os.path.join(ana_dir, a_fn))
-        clean_img.save(os.path.join(ana_dir, clean_fn))
-        writer.writerow([d_fn, a_fn, clean_fn, h, m, s])
-        
-        if (i+1) % 100 == 0: print(f"  {subset_name}: {i+1}/{count}")
-
-    csv_file.close()
+            dig_label, dig_callback = random.choice(DIGITAL_GENERATORS)
+            ana_label, ana_callback = random.choice(ANALOG_GENERATORS)
+            theme_key = random.choice(list(THEME_CONFIG.keys()))
+            
+            digital_out = dig_callback(hr, mnt, sec, img_dim)
+            analog_out, analog_clean = ana_callback(hr, mnt, sec, img_dim, THEME_CONFIG[theme_key])
+            
+            name_dig = f"{file_prefix}_dig_{dig_label}.png"
+            name_ana = f"{file_prefix}_ana_{ana_label}_{theme_key}.png"
+            name_clean = f"{file_prefix}_ana_clean_{ana_label}_{theme_key}.png"
+            
+            digital_out.save(os.path.join(dir_digital, name_dig))
+            analog_out.save(os.path.join(dir_analog, name_ana))
+            analog_clean.save(os.path.join(dir_analog, name_clean))
+            
+            # Write specific data rows to each CSV
+            writer_dig.writerow([name_dig, hr, mnt, sec])
+            writer_ana.writerow([name_ana, name_clean, hr, mnt, sec])
+            
+            if (idx + 1) % 100 == 0:
+                print(f"  [{partition.upper()}] Progress: {idx + 1} / {total_samples}")
 
 def main():
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--output_dir", type=str, required=True)
-    parser.add_argument("--train_count", type=int, default=1000)
-    parser.add_argument("--test_count", type=int, default=200)
-    parser.add_argument("--image_size", type=int, default=256)
-    parser.add_argument("--seed", type=int, default=42)
-    args = parser.parse_args()
+    # --- Edit parameters below before executing ---
+    EXPORT_PATH = "datasets"
+    SAMPLES_TRAIN = 50
+    SAMPLES_TEST = 10
+    PIXEL_SIZE = 256
     
-    random.seed(args.seed)
-    manager = DatasetManager(train_max_unique=400)
+    # Note: Fixed the init parameter name from your snippet to match the constructor
+    dataset_mgr = ClockDatasetBuilder(max_unique_train_samples=400)
     
-    generate_subset(manager, 'train', args.train_count, args.output_dir, (args.image_size, args.image_size))
-    generate_subset(manager, 'test', args.test_count, args.output_dir, (args.image_size, args.image_size))
+    compile_dataset(dataset_mgr, 'train', SAMPLES_TRAIN, EXPORT_PATH, (PIXEL_SIZE, PIXEL_SIZE))
+    compile_dataset(dataset_mgr, 'test', SAMPLES_TEST, EXPORT_PATH, (PIXEL_SIZE, PIXEL_SIZE))
 
 if __name__ == "__main__":
     main()

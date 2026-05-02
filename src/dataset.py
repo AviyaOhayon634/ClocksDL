@@ -1,64 +1,85 @@
 import os
-import pandas as pd
 import torch
-from torch.utils.data import Dataset
+import pandas as pd
 from PIL import Image
+from torch.utils.data import Dataset
 
-class ClockDataset(Dataset):
-    def __init__(self, root_dir, subset="train", transform=None):
-        self.root_dir = os.path.join(root_dir, subset)
-        self.labels_path = os.path.join(self.root_dir, "labels.csv")
+class TimepieceDataset(Dataset):
+    """
+    Custom PyTorch Dataset for loading paired digital and analog clock faces.
+    Expects architecture: base_path -> [analog|digital] -> partition
+    """
+    def __init__(self, base_path: str, partition: str = "train", transforms_pipeline=None):
+        super().__init__()
+        self.base_path = base_path
+        self.partition = partition
+        self.transforms_pipeline = transforms_pipeline
         
-        if not os.path.exists(self.labels_path):
-            raise FileNotFoundError(f"labels.csv not found at: {self.labels_path}")
-
-        self.df = pd.read_csv(self.labels_path)
-        self.transform = transform
+        # Define exact paths to the newly separated CSV files
+        self.dig_csv_path = os.path.join(base_path, "digital", partition, "labels.csv")
+        self.ana_csv_path = os.path.join(base_path, "analog", partition, "labels.csv")
+        
+        # Validate existence
+        if not os.path.exists(self.dig_csv_path):
+            raise FileNotFoundError(f"Missing digital records: {self.dig_csv_path}")
+        if not os.path.exists(self.ana_csv_path):
+            raise FileNotFoundError(f"Missing analog records: {self.ana_csv_path}")
+            
+        # Load metadata
+        self.digital_records = pd.read_csv(self.dig_csv_path)
+        self.analog_records = pd.read_csv(self.ana_csv_path)
+        
+        # Safety check to ensure both folders generated the same amount of samples
+        if len(self.digital_records) != len(self.analog_records):
+            raise ValueError("Mismatch in dataset sizes between analog and digital records!")
 
     def __len__(self):
-        return len(self.df)
+        return len(self.digital_records)
 
-    def __getitem__(self, idx):
-        row = self.df.iloc[idx]
+    def __getitem__(self, index: int):
+        rec_dig = self.digital_records.iloc[index]
+        rec_ana = self.analog_records.iloc[index]
         
-        # 1. Load Paths
-        d_fn = str(row["digital_filename"])
-        a_fn = str(row["analog_filename"])
-        # Clean filename is optional, if not present we can use the analog image as a placeholder for the clean image
-        c_fn = str(row["analog_clean_filename"]) if "analog_clean_filename" in row else None
-
-        dig_path = os.path.join(self.root_dir, "digital", d_fn)
-        ana_path = os.path.join(self.root_dir, "analog", a_fn)
+        # 1. Extract filenames using the new CSV headers
+        file_dig = str(rec_dig["filename"])
+        file_ana = str(rec_ana["filename"])
+        file_clean = str(rec_ana["clean_filename"]) if "clean_filename" in rec_ana else None
         
-        # 2. Open Images
-        digital_img = Image.open(dig_path).convert("RGB") 
-        analog_img = Image.open(ana_path).convert("RGB")
+        # 2. Construct precise file paths
+        path_d = os.path.join(self.base_path, "digital", self.partition, file_dig)
+        path_a = os.path.join(self.base_path, "analog", self.partition, file_ana)
         
-        if c_fn:
-            clean_path = os.path.join(self.root_dir, "analog", c_fn)
-            clean_img = Image.open(clean_path).convert("RGB")
+        # 3. Load image pixels into memory
+        img_d = Image.open(path_d).convert("RGB")
+        img_a = Image.open(path_a).convert("RGB")
+        
+        if file_clean:
+            path_c = os.path.join(self.base_path, "analog", self.partition, file_clean)
+            img_c = Image.open(path_c).convert("RGB")
         else:
-            # Fallback if clean image is not available, we can use the analog image as a placeholder
-            clean_img = analog_img.copy()
-
-        # 3. Apply Transforms
-        if self.transform:
-            digital_img = self.transform(digital_img)
-            analog_img = self.transform(analog_img)
-            clean_img = self.transform(clean_img)
-
-        # 4. Parse Time Labels
-        h = int(row["hour"])
-        m = int(row["minute"])
-        s = int(row["second"])
+            # Fallback if clean image isn't in the dataframe
+            img_c = img_a.copy()
+            
+        # 4. Apply vision transforms
+        if self.transforms_pipeline:
+            img_d = self.transforms_pipeline(img_d)
+            img_a = self.transforms_pipeline(img_a)
+            img_c = self.transforms_pipeline(img_c)
+            
+        # 5. Extract time labels (using digital record, though both match)
+        hr = int(rec_dig["hour"])
+        mnt = int(rec_dig["minute"])
+        sec = int(rec_dig["second"])
         
-        # Normalized labels for regression (0-1 range)
-        time_label = torch.tensor([h/23.0, m/59.0, s/59.0], dtype=torch.float32)
-
+        # Format targets (0-1 regression bounds and raw integers)
+        scaled_time = torch.tensor([hr / 23.0, mnt / 59.0, sec / 59.0], dtype=torch.float32)
+        raw_time = torch.tensor([hr, mnt, sec], dtype=torch.long)
+        
+        # Return exact same dictionary structure
         return {
-            "digital_img": digital_img,
-            "analog_img": analog_img,
-            "clean_img": clean_img,  
-            "time_label": time_label,
-            "original_time": torch.tensor([h, m, s], dtype=torch.long)
+            "digital_img": img_d,
+            "analog_img": img_a,
+            "clean_img": img_c,  
+            "time_label": scaled_time,
+            "original_time": raw_time
         }
