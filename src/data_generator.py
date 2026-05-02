@@ -412,8 +412,8 @@ def compile_dataset(builder: ClockDatasetBuilder, partition: str, total_samples:
 def main():
     # --- Edit parameters below before executing ---
     EXPORT_PATH = "datasets"
-    SAMPLES_TRAIN = 50
-    SAMPLES_TEST = 10
+    SAMPLES_TRAIN = 13000
+    SAMPLES_TEST = 3000
     PIXEL_SIZE = 256
     
     # Note: Fixed the init parameter name from your snippet to match the constructor
