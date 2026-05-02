@@ -1,2 +1,13 @@
 .venv
 /results
+
+# Ignore Image Files
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+*.bmp
+*.ico
+*.tiff
