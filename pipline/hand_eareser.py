@@ -2,6 +2,57 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
+class BasicHandRemover(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+        self.down1 = self._build_layer(3, 64)
+        self.down2 = self._build_layer(64, 128)
+        self.down3 = self._build_layer(128, 256)
+        self.max_pool = nn.MaxPool2d(2, 2)
+
+        self.up_scale2 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.up_layer2 = self._build_layer(256 + 128, 128)
+
+        self.up_scale1 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.up_layer1 = self._build_layer(128 + 64, 64)
+
+        self.output_conv = nn.Conv2d(64, 3, kernel_size=1)
+
+    def _build_layer(self, in_channels, out_channels):
+        return nn.Sequential(
+            nn.Conv2d(in_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(out_channels, out_channels, 3, padding=1),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, img_tensor):
+        down1 = self.down1(img_tensor)
+        pool1 = self.max_pool(down1)
+
+        down2 = self.down2(pool1)
+        pool2 = self.max_pool(down2)
+
+        down3 = self.down3(pool2)
+
+        up2 = self.up_scale2(down3)
+        if up2.size() != down2.size():
+            up2 = F.interpolate(up2, size=down2.shape[2:])
+        up2 = torch.cat([up2, down2], dim=1)
+        up2_out = self.up_layer2(up2)
+
+        up1 = self.up_scale1(up2_out)
+        if up1.size() != down1.size():
+            up1 = F.interpolate(up1, size=down1.shape[2:])
+        up1 = torch.cat([up1, down1], dim=1)
+        up1_out = self.up_layer1(up1)
+
+        return torch.sigmoid(self.output_conv(up1_out))
+
 class ConvBlock(nn.Module):
     def __init__(self, in_c, out_c):
         super().__init__()
