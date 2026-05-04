@@ -1,13 +1,33 @@
-.venv
-/results
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
 
-# Ignore Image Files
-*.png
-*.jpg
-*.jpeg
-*.gif
-*.svg
-*.webp
-*.bmp
-*.ico
-*.tiff
+# Jupyter checkpoints
+.ipynb_checkpoints/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Generated data
+data/
+datasets/
+
+
+# Model weights
+*.pth
+*.pt
+*.ckpt
+*.h5
+*.onnx
+
+# System files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
