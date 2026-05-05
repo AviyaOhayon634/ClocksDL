@@ -27,7 +27,7 @@ CHECKPOINT_DIR.mkdir(parents=True, exist_ok=True)
 PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
 
 IMAGE_SIZE = 256
-BATCH_SIZE = 32
+BATCH_SIZE = 16
 NUM_EPOCHS = 60
 LEARNING_RATE = 1e-4
 
@@ -204,8 +204,8 @@ if __name__ == "__main__":
     train_dataset = ClockEraserDataset(TRAIN_CSV, transform=transform)
     test_dataset = ClockEraserDataset(TEST_CSV, transform=transform)
 
-    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=0)
-    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=0)
+    train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True, num_workers=4, pin_memory=True)
+    test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False, num_workers=4, pin_memory=True)
 
     print("Train samples:", len(train_dataset))
     print("Test samples:", len(test_dataset))
