@@ -16,14 +16,6 @@ env/
 data/
 datasets/
 
-
-# Model weights
-*.pth
-*.pt
-*.ckpt
-*.h5
-*.onnx
-
 # System files
 .DS_Store
 Thumbs.db
