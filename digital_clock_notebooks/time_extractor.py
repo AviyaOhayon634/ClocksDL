@@ -1,5 +1,3 @@
-import cv2
-import matplotlib.pyplot as plt
 from ultralytics import YOLO
 
 CONF_ORIG = 0.4
@@ -30,7 +28,7 @@ class TimeExtractor:
 
             original_detections.append((label, conf, [x1,y1,x2,y2], xc, yc, "orig"))
 
-            return original_detections
+        return original_detections
     
     def sliding_collect(self, image, window_size=416, stride=200):
 
