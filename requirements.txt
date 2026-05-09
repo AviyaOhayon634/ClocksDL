@@ -1,0 +1,33 @@
+# ── Python Version ──────────────────────────────────────────
+# Python 3.12.4 (64-bit)
+
+# ── Deep Learning ───────────────────────────────────────────
+torch==2.11.0
+torchvision==0.26.0
+
+# ── Computer Vision ─────────────────────────────────────────
+opencv-python==4.11.0.86
+Pillow==9.5.0
+
+# ── Numerical ───────────────────────────────────────────────
+numpy==1.26.4
+
+# ── Inpainting ──────────────────────────────────────────────
+simple-lama-inpainting==0.1.2
+
+# ── Visualization ───────────────────────────────────────────
+matplotlib==3.10.9
+
+# ── Training utilities ──────────────────────────────────────
+tqdm==4.67.3
+
+# ── Notebook / Development ──────────────────────────────────
+jupyter==1.1.1
+jupyterlab==4.5.7
+ipykernel==7.2.0
+ipywidgets==8.1.8
+
+# ── Git LFS (install separately via Git, not pip) ───────────
+# Run once after cloning:
+#   git lfs install
+#   git lfs pull
