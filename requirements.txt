@@ -31,3 +31,7 @@ ipywidgets==8.1.8
 # Run once after cloning:
 #   git lfs install
 #   git lfs pull
+
+# -- Demo UI --
+gradio>=4.0
+ultralytics>=8.0
