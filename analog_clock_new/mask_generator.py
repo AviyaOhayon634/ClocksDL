@@ -8,7 +8,7 @@ import torchvision.transforms.functional as TF
 from pathlib import Path
 from PIL import Image
 
-from visualize_geometry import get_clock_geometry
+from analog_clock_new.visualize_geometry import get_clock_geometry
 
 
 # =========================
@@ -16,7 +16,7 @@ from visualize_geometry import get_clock_geometry
 # =========================
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-CHECKPOINT_PATH = "outputs/checkpoints/best_mask_unet.pth"
+CHECKPOINT_PATH = "analog_clock_new/outputs/checkpoints/best_mask_unet.pth"
 
 _MEAN = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
 _STD  = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)

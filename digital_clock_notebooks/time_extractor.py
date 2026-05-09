@@ -3,9 +3,11 @@ from ultralytics import YOLO
 CONF_ORIG = 0.4
 CONF_CROP = 0.5
 
+MODEL_PATH = "runs/detect/digit_detector4/weights/best.pt"
+
 class TimeExtractor:
-    def __init__(self, model_path,verbose=False):
-        self.model = YOLO(model_path,verbose=verbose)
+    def __init__(self,model = MODEL_PATH, verbose=False):
+        self.model = YOLO(model,verbose=verbose)
 
     def original_detections(self, image_path) -> list:
 
@@ -288,7 +290,7 @@ class TimeExtractor:
 
     def extract_time(self, image_path):
 
-        result = self.model(image_path, verbose=False)[0]
+        result = self.model(image_path)[0]
 
         img_original = result.orig_img.copy()
 
